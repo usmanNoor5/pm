@@ -1,10 +1,13 @@
 import os
+import time
 from dataclasses import dataclass
+from logging import getLogger
 
 import httpx
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "qwen/qwen3.6-plus-preview:free"
+logger = getLogger(__name__)
 
 
 class MissingApiKeyError(Exception):
@@ -17,8 +20,10 @@ class AiServiceError(Exception):
 
 @dataclass
 class AiReply:
+    ok: bool
     model: str
-    answer: str
+    response: str | None
+    error: str | None
 
 
 def request_ai_message(prompt: str) -> AiReply:
@@ -27,6 +32,7 @@ def request_ai_message(prompt: str) -> AiReply:
         raise MissingApiKeyError("OPENROUTER_API_KEY is not configured")
 
     model = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
+    started_at = time.perf_counter()
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
@@ -50,7 +56,19 @@ def request_ai_message(prompt: str) -> AiReply:
         response = httpx.post(OPENROUTER_CHAT_URL, headers=headers, json=payload, timeout=30.0)
         response.raise_for_status()
     except httpx.HTTPError as exc:
+        latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        logger.warning(
+            "openrouter_call_failed",
+            extra={"model": model, "status": status_code, "latency_ms": latency_ms},
+        )
         raise AiServiceError("OpenRouter request failed") from exc
+
+    latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    logger.info(
+        "openrouter_call_succeeded",
+        extra={"model": model, "status": response.status_code, "latency_ms": latency_ms},
+    )
 
     body = response.json()
     choices = body.get("choices")
@@ -65,4 +83,4 @@ def request_ai_message(prompt: str) -> AiReply:
     if not isinstance(content, str) or not content.strip():
         raise AiServiceError("OpenRouter response missing content")
 
-    return AiReply(model=model, answer=content.strip())
+    return AiReply(ok=True, model=model, response=content.strip(), error=None)

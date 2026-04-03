@@ -27,6 +27,7 @@ Execution rules:
 	- Save-flow guards against stale async responses overwriting newer edits.
 - Local script behavior:
 	- Start scripts support `HOST_PORT` override to avoid local port conflicts.
+	- Start scripts mount a persistent Docker volume for SQLite data so board changes survive container recreation.
 
 ## Part 1: Planning and Baseline Documentation
 
@@ -66,11 +67,13 @@ Tests:
 - App starts from scripts on Linux/macOS/Windows command variants.
 - `GET /` returns hello-world HTML.
 - `GET /api/health` returns success JSON.
+- General persistence validation: make a data change, restart with the normal start/stop scripts, and confirm the change is still present.
 
 Success criteria:
 - One command path to build and run locally is documented and works.
 - Backend is reachable on configured port.
 - Static + API route confirmed end-to-end.
+- Local restarts do not reset persisted board data.
 
 ## Part 3: Add Existing Frontend Build and Serving
 
@@ -140,6 +143,7 @@ Tests:
 - Backend unit tests for CRUD/data mapping behavior.
 - API tests for authorized and unauthorized cases.
 - Startup test verifies DB file/table creation when absent.
+- General persistence regression check: verify representative CRUD changes remain after service restart.
 
 Success criteria:
 - Board state persists between restarts.
@@ -165,10 +169,10 @@ Success criteria:
 ## Part 8: AI Connectivity via OpenRouter
 
 Status checklist:
-- [ ] Add backend OpenRouter client configuration.
-- [ ] Use `OPENROUTER_API_KEY` from project `.env`.
-- [ ] Configure model `qwen/qwen3.6-plus-preview:free`.
-- [ ] Add minimal connectivity route/service for AI test prompt.
+- [x] Add backend OpenRouter client configuration.
+- [x] Use `OPENROUTER_API_KEY` from project `.env`.
+- [x] Configure model `qwen/qwen3.6-plus-preview:free`.
+- [x] Add minimal connectivity route/service for AI test prompt.
 
 Tests:
 - Integration test path for a simple `2+2` prompt (can be opt-in/manual if key unavailable in CI).

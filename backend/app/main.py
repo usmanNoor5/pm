@@ -57,10 +57,11 @@ class AiPingRequest(BaseModel):
     question: str = "2+2"
 
 
-class AiPingResponse(BaseModel):
-    model: str
-    question: str
-    answer: str
+class AiServiceResponse(BaseModel):
+    ok: bool
+    model: str | None = None
+    response: str | None = None
+    error: str | None = None
 
 
 def _sign_session_id(session_id: str) -> str:
@@ -203,18 +204,42 @@ def update_board(payload: BoardUpdateRequest, request: Request) -> BoardResponse
     return BoardResponse(board=updated)
 
 
-@app.post("/api/ai/ping", response_model=AiPingResponse)
-def ai_ping(payload: AiPingRequest, request: Request) -> AiPingResponse:
+@app.post("/api/ai/ping", response_model=AiServiceResponse)
+def ai_ping(payload: AiPingRequest, request: Request) -> JSONResponse:
     _require_user(request)
 
     try:
         reply = request_ai_message(payload.question)
     except MissingApiKeyError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return JSONResponse(
+            status_code=503,
+            content=AiServiceResponse(
+                ok=False,
+                model=os.getenv("OPENROUTER_MODEL"),
+                response=None,
+                error=str(exc),
+            ).model_dump(),
+        )
     except AiServiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return JSONResponse(
+            status_code=502,
+            content=AiServiceResponse(
+                ok=False,
+                model=os.getenv("OPENROUTER_MODEL"),
+                response=None,
+                error=str(exc),
+            ).model_dump(),
+        )
 
-    return AiPingResponse(model=reply.model, question=payload.question, answer=reply.answer)
+    return JSONResponse(
+        status_code=200,
+        content=AiServiceResponse(
+            ok=reply.ok,
+            model=reply.model,
+            response=reply.response,
+            error=reply.error,
+        ).model_dump(),
+    )
 
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend-out"
