@@ -7,7 +7,7 @@ This project is building a Project Management App. Key features:
 - When signed in, the user sees a Kanban board representing their project
 - The Kanban board has fixed columns that can be renamed
 - The cards on the Kanban board can be moved with drag and drop, and edited
-- There is an AI chat feature in a sidebar; the AI is able to create / edit / move one or more cards
+- There is an AI chat feature in a compact assistant panel; the AI is able to create / edit / move one or more cards
 
 ## Limitations
 
@@ -24,7 +24,7 @@ For the MVP, this will run locally (in a docker container)
 - Everything packaged into a Docker container
 - Use "uv" as the package manager for python in the Docker container
 - Use OpenRouter for the AI calls. An OPENROUTER_API_KEY is in .env in the project root
-- Use `qwen/qwen3.6-plus-preview:free` as the model
+- Use `qwen/qwen3.6-plus:free` as the model
 - Use SQLLite local database for the database, creating a new db if it doesn't exist
 - Start and Stop server scripts for Mac, PC, Linux in scripts/
 

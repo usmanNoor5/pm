@@ -136,6 +136,66 @@ const installAuthMocks = async (page: Page) => {
 
     await route.fulfill({ status: 405 });
   });
+
+  await page.route("**/api/ai/chat", async (route) => {
+    const request = route.request();
+    if (!authenticated) {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Not authenticated" }),
+      });
+      return;
+    }
+
+    if (request.method() !== "POST") {
+      await route.fulfill({ status: 405 });
+      return;
+    }
+
+    const payload = request.postDataJSON() as {
+      message?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
+
+    const message = payload.message?.toLowerCase() ?? "";
+    if (message.includes("rename") && message.includes("inbox")) {
+      board = {
+        ...board,
+        columns: board.columns.map((column, index) =>
+          index === 0 ? { ...column, title: "Inbox by AI" } : column
+        ),
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          model: "qwen/qwen3.6-plus:free",
+          response: "Done. I renamed the first column to Inbox by AI.",
+          error: null,
+          board,
+          boardUpdated: true,
+          fallbackUsed: false,
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        model: "qwen/qwen3.6-plus:free",
+        response: "No board updates needed.",
+        error: null,
+        board: null,
+        boardUpdated: false,
+        fallbackUsed: false,
+      }),
+    });
+  });
 };
 
 const login = async (page: Page) => {
@@ -205,4 +265,20 @@ test("persists board updates after reload", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: /kanban studio/i })).toBeVisible();
   await expect(page.locator('[data-testid^="column-"]').first().getByLabel("Column title")).toHaveValue("Inbox");
+});
+
+test("applies AI chat board updates", async ({ page }) => {
+  await login(page);
+  await page.getByRole("button", { name: /open ai assistant/i }).click();
+  await page
+    .getByPlaceholder("Try: Move card-1 to Review and rename Review to QA")
+    .fill("Rename first column to Inbox by AI");
+  await page.getByRole("button", { name: /send to ai/i }).click();
+
+  await expect(page.locator('[data-testid^="column-"]').first().getByLabel("Column title")).toHaveValue(
+    "Inbox by AI"
+  );
+  await expect(page.getByTestId("chat-message-assistant").last()).toContainText(
+    "renamed the first column"
+  );
 });

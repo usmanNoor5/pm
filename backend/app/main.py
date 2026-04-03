@@ -9,9 +9,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Literal
 
 from app.ai import AiServiceError, MissingApiKeyError, request_ai_message
+from app.ai_board import build_ai_board_prompt, parse_ai_structured_output
 from app.db import BoardModel, get_board_for_user, init_db, replace_board_for_user
 
 SESSION_COOKIE_NAME = "pm_session"
@@ -57,11 +59,27 @@ class AiPingRequest(BaseModel):
     question: str = "2+2"
 
 
+class AiChatHistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class AiChatRequest(BaseModel):
+    message: str = Field(min_length=1)
+    history: list[AiChatHistoryMessage] = Field(default_factory=list)
+
+
 class AiServiceResponse(BaseModel):
     ok: bool
     model: str | None = None
     response: str | None = None
     error: str | None = None
+
+
+class AiChatResponse(AiServiceResponse):
+    board: BoardModel | None = None
+    boardUpdated: bool = False
+    fallbackUsed: bool = False
 
 
 def _sign_session_id(session_id: str) -> str:
@@ -238,6 +256,70 @@ def ai_ping(payload: AiPingRequest, request: Request) -> JSONResponse:
             model=reply.model,
             response=reply.response,
             error=reply.error,
+        ).model_dump(),
+    )
+
+
+@app.post("/api/ai/chat", response_model=AiChatResponse)
+def ai_chat(payload: AiChatRequest, request: Request) -> JSONResponse:
+    username = _require_user(request)
+
+    current_board = get_board_for_user(username)
+    prompt = build_ai_board_prompt(
+        user_message=payload.message,
+        conversation_history=[m.model_dump() for m in payload.history],
+        current_board=current_board,
+    )
+
+    try:
+        reply = request_ai_message(prompt)
+    except MissingApiKeyError as exc:
+        return JSONResponse(
+            status_code=503,
+            content=AiChatResponse(
+                ok=False,
+                model=os.getenv("OPENROUTER_MODEL"),
+                response=None,
+                error=str(exc),
+                board=None,
+                boardUpdated=False,
+                fallbackUsed=False,
+            ).model_dump(),
+        )
+    except AiServiceError as exc:
+        return JSONResponse(
+            status_code=502,
+            content=AiChatResponse(
+                ok=False,
+                model=os.getenv("OPENROUTER_MODEL"),
+                response=None,
+                error=str(exc),
+                board=None,
+                boardUpdated=False,
+                fallbackUsed=False,
+            ).model_dump(),
+        )
+
+    parsed_response, parsed_board, fallback_used, parse_error = parse_ai_structured_output(
+        reply.response or ""
+    )
+
+    applied_board: BoardModel | None = None
+    board_updated = False
+    if parsed_board is not None and not fallback_used:
+        applied_board = replace_board_for_user(username, parsed_board)
+        board_updated = True
+
+    return JSONResponse(
+        status_code=200,
+        content=AiChatResponse(
+            ok=True,
+            model=reply.model,
+            response=parsed_response,
+            error=parse_error,
+            board=applied_board,
+            boardUpdated=board_updated,
+            fallbackUsed=fallback_used,
         ).model_dump(),
     )
 

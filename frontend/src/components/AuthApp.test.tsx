@@ -67,4 +67,66 @@ describe("AuthApp", () => {
       );
     });
   });
+
+  it("applies board updates returned by AI chat", async () => {
+    const updatedBoard = {
+      ...initialData,
+      columns: initialData.columns.map((column, index) =>
+        index === 0 ? { ...column, title: "Inbox by AI" } : column
+      ),
+    };
+
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: false, username: null }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ board: initialData }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            model: "qwen/qwen3.6-plus:free",
+            response: "Updated your first column title.",
+            error: null,
+            board: updatedBoard,
+            boardUpdated: true,
+            fallbackUsed: false,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+
+    render(<AuthApp />);
+
+    await screen.findByRole("heading", { name: /sign in/i });
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await screen.findByRole("heading", { name: /kanban studio/i });
+    await userEvent.click(screen.getByRole("button", { name: /open ai assistant/i }));
+
+    await userEvent.type(
+      screen.getByLabelText(/message/i),
+      "Rename first column to Inbox by AI"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send to ai/i }));
+
+    expect(await screen.findByDisplayValue("Inbox by AI")).toBeInTheDocument();
+    expect(await screen.findByText(/updated your first column title/i)).toBeInTheDocument();
+  });
 });

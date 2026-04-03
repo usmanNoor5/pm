@@ -64,7 +64,7 @@ def test_ai_ping_success_with_mock(client: TestClient, monkeypatch: pytest.Monke
 
     class MockReply:
         ok = True
-        model = "qwen/qwen3.6-plus-preview:free"
+        model = "qwen/qwen3.6-plus:free"
         response = "4"
         error = None
 
@@ -76,7 +76,7 @@ def test_ai_ping_success_with_mock(client: TestClient, monkeypatch: pytest.Monke
     assert payload["ok"] is True
     assert payload["response"] == "4"
     assert payload["error"] is None
-    assert payload["model"] == "qwen/qwen3.6-plus-preview:free"
+    assert payload["model"] == "qwen/qwen3.6-plus:free"
 
 
 @pytest.mark.integration
@@ -88,13 +88,13 @@ def test_ai_ping_live_connectivity_opt_in(client: TestClient, monkeypatch: pytes
         pytest.skip("OPENROUTER_API_KEY is required for live OpenRouter connectivity test")
 
     _login(client)
-    monkeypatch.setenv("OPENROUTER_MODEL", "qwen/qwen3.6-plus-preview:free")
+    monkeypatch.setenv("OPENROUTER_MODEL", "qwen/qwen3.6-plus:free")
     response = client.post("/api/ai/ping", json={"question": "2+2"})
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["ok"] is True
-    assert payload["model"] == "qwen/qwen3.6-plus-preview:free"
+    assert payload["model"] == "qwen/qwen3.6-plus:free"
     assert isinstance(payload["response"], str)
     assert payload["response"].strip() != ""
     assert payload["error"] is None

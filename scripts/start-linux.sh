@@ -6,6 +6,7 @@ IMAGE_NAME="pm-mvp:local"
 CONTAINER_NAME="pm-mvp"
 VOLUME_NAME="pm-mvp-data"
 HOST_PORT="${HOST_PORT:-8000}"
+FOLLOW_LOGS="${FOLLOW_LOGS:-1}"
 
 cd "$ROOT_DIR"
 
@@ -24,3 +25,8 @@ docker run -d \
   "$IMAGE_NAME" >/dev/null
 
 echo "[start-linux] Started."
+
+if [ "$FOLLOW_LOGS" = "1" ]; then
+  echo "[start-linux] Streaming logs. Press Ctrl+C to stop log tailing (container keeps running)."
+  docker logs -f "$CONTAINER_NAME"
+fi

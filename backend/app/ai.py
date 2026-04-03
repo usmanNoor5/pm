@@ -6,7 +6,7 @@ from logging import getLogger
 import httpx
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "qwen/qwen3.6-plus-preview:free"
+DEFAULT_MODEL = "qwen/qwen3.6-plus:free"
 logger = getLogger(__name__)
 
 
@@ -59,15 +59,26 @@ def request_ai_message(prompt: str) -> AiReply:
         latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         logger.warning(
-            "openrouter_call_failed",
-            extra={"model": model, "status": status_code, "latency_ms": latency_ms},
+            "openrouter_call_failed model=%s status=%s latency_ms=%s error_type=%s",
+            model,
+            status_code,
+            latency_ms,
+            exc.__class__.__name__,
         )
+        if status_code == 401:
+            raise AiServiceError("OpenRouter rejected the API key") from exc
+        if status_code == 404:
+            raise AiServiceError(
+                "OpenRouter model endpoint not found. Set OPENROUTER_MODEL to an available model."
+            ) from exc
         raise AiServiceError("OpenRouter request failed") from exc
 
     latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
     logger.info(
-        "openrouter_call_succeeded",
-        extra={"model": model, "status": response.status_code, "latency_ms": latency_ms},
+        "openrouter_call_succeeded model=%s status=%s latency_ms=%s",
+        model,
+        response.status_code,
+        latency_ms,
     )
 
     body = response.json()

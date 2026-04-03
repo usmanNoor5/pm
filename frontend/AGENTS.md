@@ -67,6 +67,8 @@ This file describes the current frontend-only Kanban demo in `frontend/` so futu
 - Columns are fixed in count and order but titles are editable.
 - Cards can be added, deleted, and moved with drag/drop.
 - Auth session persists by cookie and board changes persist across reload.
+- AI assistant is accessed via a floating button and compact chat panel (bottom-right) to avoid shrinking the board layout.
+- AI chat calls backend `/api/ai/chat` and applies returned board updates live when `boardUpdated` is true.
 
 ## Test Coverage (Current)
 
@@ -75,9 +77,9 @@ This file describes the current frontend-only Kanban demo in `frontend/` so futu
 - `src/components/KanbanBoard.test.tsx`
   - Component tests for rendering, renaming, add/remove card
 - `src/components/AuthApp.test.tsx`
-  - Unit tests for unauthenticated login screen and successful sign-in transition
+  - Unit tests for unauthenticated login screen, successful sign-in transition, and AI chat board update application
 - `tests/kanban.spec.ts`
-  - E2E tests for auth-gated load, add card, drag/drop move, logout, and persistence after reload
+  - E2E tests for auth-gated load, add card, drag/drop move, logout, persistence after reload, and AI chat-driven board updates
 
 ## Commands
 

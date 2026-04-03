@@ -171,7 +171,7 @@ Success criteria:
 Status checklist:
 - [x] Add backend OpenRouter client configuration.
 - [x] Use `OPENROUTER_API_KEY` from project `.env`.
-- [x] Configure model `qwen/qwen3.6-plus-preview:free`.
+- [x] Configure model `qwen/qwen3.6-plus:free`.
 - [x] Add minimal connectivity route/service for AI test prompt.
 
 Tests:
@@ -185,31 +185,31 @@ Success criteria:
 ## Part 9: Structured AI Board Updates
 
 Status checklist:
-- [ ] Define strict JSON schema for AI response payload.
-- [ ] Send current Kanban JSON + user message + conversation history to AI.
-- [ ] Parse/validate structured output in backend.
-- [ ] Apply optional board update transactionally when valid.
-- [ ] Add controlled fallback when model output is malformed.
+- [x] Define strict JSON schema for AI response payload.
+- [x] Send current Kanban JSON + user message + conversation history to AI.
+- [x] Parse/validate structured output in backend.
+- [x] Apply optional board update transactionally when valid.
+- [x] Add controlled fallback when model output is malformed.
 
 Tests:
 - Unit tests for schema validation and parser.
 - Integration tests for:
-	- [ ] Response-only (no board update)
-	- [ ] Valid board update
-	- [ ] Invalid/malformed AI payload fallback
+	- [x] Response-only (no board update)
+	- [x] Valid board update
+	- [x] Invalid/malformed AI payload fallback
 
 Success criteria:
 - AI contract is deterministic at backend boundary.
 - Invalid AI output never corrupts persisted board state.
 
-## Part 10: Frontend AI Sidebar and Live Refresh
+## Part 10: Frontend AI Assistant UI and Live Refresh
 
 Status checklist:
-- [ ] Build sidebar chat UI integrated into Kanban layout.
-- [ ] Render conversation history and message states.
-- [ ] Call backend AI endpoint from frontend.
-- [ ] Update board UI automatically when AI response includes board changes.
-- [ ] Keep styling aligned with project color scheme and current visual language.
+- [x] Build compact floating chat UI integrated into Kanban experience.
+- [x] Render conversation history and message states.
+- [x] Call backend AI endpoint from frontend.
+- [x] Update board UI automatically when AI response includes board changes.
+- [x] Keep styling aligned with project color scheme and current visual language.
 
 Tests:
 - Component tests for chat interactions and render states.

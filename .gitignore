@@ -180,6 +180,8 @@ frontend/.next/
 frontend/out/
 frontend/test-results/
 frontend/playwright-report/
+frontend/playwright-results/
+frontend-test-run/
 
 # VS Code local index files
 .vscode/browse.vc.db
