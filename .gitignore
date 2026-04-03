@@ -174,3 +174,15 @@ cython_debug/
 
 .DS_Store
 
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/test-results/
+frontend/playwright-report/
+
+# VS Code local index files
+.vscode/browse.vc.db
+.vscode/browse.vc.db-shm
+.vscode/browse.vc.db-wal
+
