@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,9 +15,66 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
-  const [board, setBoard] = useState<BoardData>(() => initialData);
+type KanbanBoardProps = {
+  initialBoard?: BoardData;
+  disablePersistence?: boolean;
+};
+
+type BoardResponse = {
+  board: BoardData;
+};
+
+export const KanbanBoard = ({
+  initialBoard,
+  disablePersistence = false,
+}: KanbanBoardProps) => {
+  const resolvedInitialBoard = initialBoard ?? (disablePersistence ? initialData : null);
+  const [board, setBoard] = useState<BoardData | null>(resolvedInitialBoard);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(!resolvedInitialBoard);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const latestPersistRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (disablePersistence) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadBoard = async () => {
+      try {
+        const response = await fetch("/api/board", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load board");
+        }
+
+        const payload = (await response.json()) as BoardResponse;
+        if (!cancelled) {
+          setBoard(payload.board);
+          setSaveError(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setSaveError("Unable to load board data.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadBoard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [disablePersistence]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -25,7 +82,57 @@ export const KanbanBoard = () => {
     })
   );
 
-  const cardsById = useMemo(() => board.cards, [board.cards]);
+  const cardsById = useMemo(() => board?.cards ?? {}, [board]);
+
+  const persistBoard = useCallback(
+    async (nextBoard: BoardData, previousBoard: BoardData) => {
+      const requestId = latestPersistRequestRef.current + 1;
+      latestPersistRequestRef.current = requestId;
+
+      try {
+        const response = await fetch("/api/board", {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ board: nextBoard }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save board");
+        }
+
+        const payload = (await response.json()) as BoardResponse;
+        if (requestId === latestPersistRequestRef.current) {
+          setBoard(payload.board);
+          setSaveError(null);
+        }
+      } catch {
+        if (requestId === latestPersistRequestRef.current) {
+          setBoard(previousBoard);
+          setSaveError("Could not save your latest board change.");
+        }
+      }
+    },
+    []
+  );
+
+  const applyBoardUpdate = useCallback(
+    (updater: (prev: BoardData) => BoardData) => {
+      setBoard((previous) => {
+        if (!previous) {
+          return previous;
+        }
+        const next = updater(previous);
+        if (!disablePersistence) {
+          void persistBoard(next, previous);
+        }
+        return next;
+      });
+    },
+    [disablePersistence, persistBoard]
+  );
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -39,14 +146,14 @@ export const KanbanBoard = () => {
       return;
     }
 
-    setBoard((prev) => ({
+    applyBoardUpdate((prev) => ({
       ...prev,
       columns: moveCard(prev.columns, active.id as string, over.id as string),
     }));
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => ({
+    applyBoardUpdate((prev) => ({
       ...prev,
       columns: prev.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
@@ -56,7 +163,7 @@ export const KanbanBoard = () => {
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
     const id = createId("card");
-    setBoard((prev) => ({
+    applyBoardUpdate((prev) => ({
       ...prev,
       cards: {
         ...prev.cards,
@@ -71,7 +178,7 @@ export const KanbanBoard = () => {
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
+    applyBoardUpdate((prev) => {
       return {
         ...prev,
         cards: Object.fromEntries(
@@ -88,6 +195,16 @@ export const KanbanBoard = () => {
       };
     });
   };
+
+  if (isLoading || !board) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--surface)] px-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+          Loading board...
+        </p>
+      </main>
+    );
+  }
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
@@ -120,6 +237,11 @@ export const KanbanBoard = () => {
               </p>
             </div>
           </div>
+          {saveError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {saveError}
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-4">
             {board.columns.map((column) => (
               <div

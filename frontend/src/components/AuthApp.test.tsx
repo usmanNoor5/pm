@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { AuthApp } from "@/components/AuthApp";
+import { initialData } from "@/lib/kanban";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -40,6 +41,12 @@ describe("AuthApp", () => {
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ board: initialData }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })

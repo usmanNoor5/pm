@@ -1,24 +1,31 @@
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
-def test_health_route() -> None:
-    client = TestClient(app)
+@pytest.fixture
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_health_route(client: TestClient) -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_auth_me_is_false_before_login() -> None:
-    client = TestClient(app)
+def test_auth_me_is_false_before_login(client: TestClient) -> None:
     response = client.get("/api/auth/me")
     assert response.status_code == 200
     assert response.json() == {"authenticated": False, "username": None}
 
 
-def test_login_rejects_invalid_credentials() -> None:
-    client = TestClient(app)
+def test_login_rejects_invalid_credentials(client: TestClient) -> None:
     response = client.post(
         "/api/auth/login",
         json={"username": "wrong", "password": "creds"},
@@ -26,8 +33,7 @@ def test_login_rejects_invalid_credentials() -> None:
     assert response.status_code == 401
 
 
-def test_login_sets_cookie_and_logout_clears_session() -> None:
-    client = TestClient(app)
+def test_login_sets_cookie_and_logout_clears_session(client: TestClient) -> None:
 
     login_response = client.post(
         "/api/auth/login",

@@ -90,11 +90,11 @@ Success criteria:
 ## Part 5: Database Modeling and Design Sign-Off
 
 Status checklist:
-- [ ] Propose normalized schema for users, boards, columns, cards.
-- [ ] Add optional board snapshot JSON strategy and rationale.
-- [ ] Define migration/bootstrap strategy for creating DB if missing.
-- [ ] Document schema and tradeoffs in `docs/`.
-- [ ] Get user sign-off before implementing persistence APIs.
+- [x] Propose normalized schema for users, boards, columns, cards.
+- [x] Add optional board snapshot JSON strategy and rationale.
+- [x] Define migration/bootstrap strategy for creating DB if missing.
+- [x] Document schema and tradeoffs in `docs/`.
+- [x] Get user sign-off before implementing persistence APIs.
 
 Tests:
 - Design review only (no production persistence behavior yet).
@@ -109,10 +109,10 @@ Checkpoint:
 ## Part 6: Backend Persistence API
 
 Status checklist:
-- [ ] Implement SQLite setup and auto-create logic at startup.
-- [ ] Implement data access layer for board read/write operations.
-- [ ] Add API routes for board fetch/update per authenticated user.
-- [ ] Validate request payloads and enforce consistent response models.
+- [x] Implement SQLite setup and auto-create logic at startup.
+- [x] Implement data access layer for board read/write operations.
+- [x] Add API routes for board fetch/update per authenticated user.
+- [x] Validate request payloads and enforce consistent response models.
 
 Tests:
 - Backend unit tests for CRUD/data mapping behavior.
@@ -126,10 +126,10 @@ Success criteria:
 ## Part 7: Frontend + Backend Integration
 
 Status checklist:
-- [ ] Replace frontend in-memory board source with backend API.
-- [ ] Load board on app startup after login.
-- [ ] Persist column rename/card create/move/edit/delete through API.
-- [ ] Handle loading and error states minimally but clearly.
+- [x] Replace frontend in-memory board source with backend API.
+- [x] Load board on app startup after login.
+- [x] Persist column rename/card create/move/edit/delete through API.
+- [x] Handle loading and error states minimally but clearly.
 
 Tests:
 - Frontend integration tests with API mocking.

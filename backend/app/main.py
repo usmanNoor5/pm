@@ -3,6 +3,7 @@ import hmac
 import os
 import secrets
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,102 +11,126 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="Project Management MVP API")
+from app.db import BoardModel, get_board_for_user, init_db, replace_board_for_user
 
 SESSION_COOKIE_NAME = "pm_session"
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "28800"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {
-  "1",
-  "true",
-  "yes",
+    "1",
+    "true",
+    "yes",
 }
 SESSION_SECRET = os.getenv("SESSION_SECRET") or secrets.token_urlsafe(32)
 
 _sessions: dict[str, dict[str, str | float]] = {}
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Project Management MVP API", lifespan=lifespan)
+
+
 class LoginRequest(BaseModel):
-  username: str
-  password: str
+    username: str
+    password: str
 
 
 class AuthState(BaseModel):
-  authenticated: bool
-  username: str | None = None
+    authenticated: bool
+    username: str | None = None
+
+
+class BoardResponse(BaseModel):
+    board: BoardModel
+
+
+class BoardUpdateRequest(BaseModel):
+    board: BoardModel
 
 
 def _sign_session_id(session_id: str) -> str:
-  digest = hmac.new(
-    SESSION_SECRET.encode("utf-8"),
-    session_id.encode("utf-8"),
-    hashlib.sha256,
-  )
-  return digest.hexdigest()
+    digest = hmac.new(
+        SESSION_SECRET.encode("utf-8"),
+        session_id.encode("utf-8"),
+        hashlib.sha256,
+    )
+    return digest.hexdigest()
 
 
 def _encode_session_cookie(session_id: str) -> str:
-  return f"{session_id}.{_sign_session_id(session_id)}"
+    return f"{session_id}.{_sign_session_id(session_id)}"
 
 
 def _decode_session_cookie(raw_cookie: str | None) -> str | None:
-  if not raw_cookie or "." not in raw_cookie:
-    return None
-  session_id, signature = raw_cookie.rsplit(".", 1)
-  expected_signature = _sign_session_id(session_id)
-  if not hmac.compare_digest(signature, expected_signature):
-    return None
-  return session_id
+    if not raw_cookie or "." not in raw_cookie:
+        return None
+    session_id, signature = raw_cookie.rsplit(".", 1)
+    expected_signature = _sign_session_id(session_id)
+    if not hmac.compare_digest(signature, expected_signature):
+        return None
+    return session_id
 
 
 def _cleanup_expired_sessions() -> None:
-  now = time.time()
-  expired_ids = [
-    session_id
-    for session_id, session in _sessions.items()
-    if float(session["expires_at"]) <= now
-  ]
-  for session_id in expired_ids:
-    _sessions.pop(session_id, None)
+    now = time.time()
+    expired_ids = [
+        session_id
+        for session_id, session in _sessions.items()
+        if float(session["expires_at"]) <= now
+    ]
+    for session_id in expired_ids:
+        _sessions.pop(session_id, None)
 
 
 def _set_session_cookie(response: JSONResponse, session_id: str) -> None:
-  response.set_cookie(
-    key=SESSION_COOKIE_NAME,
-    value=_encode_session_cookie(session_id),
-    max_age=SESSION_TTL_SECONDS,
-    expires=SESSION_TTL_SECONDS,
-    path="/",
-    secure=SESSION_COOKIE_SECURE,
-    httponly=True,
-    samesite="lax",
-  )
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=_encode_session_cookie(session_id),
+        max_age=SESSION_TTL_SECONDS,
+        expires=SESSION_TTL_SECONDS,
+        path="/",
+        secure=SESSION_COOKIE_SECURE,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 def _clear_session_cookie(response: JSONResponse) -> None:
-  response.delete_cookie(
-    key=SESSION_COOKIE_NAME,
-    path="/",
-    secure=SESSION_COOKIE_SECURE,
-    httponly=True,
-    samesite="lax",
-  )
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        secure=SESSION_COOKIE_SECURE,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 def _current_username(request: Request) -> str | None:
-  _cleanup_expired_sessions()
-  session_id = _decode_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
-  if not session_id:
-    return None
+    _cleanup_expired_sessions()
+    session_id = _decode_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+    if not session_id:
+        return None
 
-  session = _sessions.get(session_id)
-  if not session:
-    return None
+    session = _sessions.get(session_id)
+    if not session:
+        return None
 
-  if float(session["expires_at"]) <= time.time():
-    _sessions.pop(session_id, None)
-    return None
+    if float(session["expires_at"]) <= time.time():
+        _sessions.pop(session_id, None)
+        return None
 
-  return str(session["username"])
+    return str(session["username"])
+
+
+def _require_user(request: Request) -> str:
+    username = _current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return username
 
 
 @app.get("/api/health")
@@ -115,51 +140,67 @@ def health() -> dict[str, str]:
 
 @app.get("/api/auth/me", response_model=AuthState)
 def auth_me(request: Request) -> AuthState:
-  username = _current_username(request)
-  if not username:
-    return AuthState(authenticated=False)
-  return AuthState(authenticated=True, username=username)
+    username = _current_username(request)
+    if not username:
+        return AuthState(authenticated=False)
+    return AuthState(authenticated=True, username=username)
 
 
 @app.post("/api/auth/login", response_model=AuthState)
 def auth_login(payload: LoginRequest) -> JSONResponse:
-  if payload.username != "user" or payload.password != "password":
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    if payload.username != "user" or payload.password != "password":
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-  session_id = secrets.token_urlsafe(32)
-  _sessions[session_id] = {
-    "username": payload.username,
-    "expires_at": time.time() + SESSION_TTL_SECONDS,
-  }
+    session_id = secrets.token_urlsafe(32)
+    _sessions[session_id] = {
+        "username": payload.username,
+        "expires_at": time.time() + SESSION_TTL_SECONDS,
+    }
 
-  response = JSONResponse(
-    status_code=200,
-    content=AuthState(authenticated=True, username=payload.username).model_dump(),
-  )
-  _set_session_cookie(response, session_id)
-  return response
+    response = JSONResponse(
+        status_code=200,
+        content=AuthState(authenticated=True, username=payload.username).model_dump(),
+    )
+    _set_session_cookie(response, session_id)
+    return response
 
 
 @app.post("/api/auth/logout", response_model=AuthState)
 def auth_logout(request: Request) -> JSONResponse:
-  session_id = _decode_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
-  if session_id:
-    _sessions.pop(session_id, None)
+    session_id = _decode_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+    if session_id:
+        _sessions.pop(session_id, None)
 
-  response = JSONResponse(status_code=200, content=AuthState(authenticated=False).model_dump())
-  _clear_session_cookie(response)
-  return response
+    response = JSONResponse(
+        status_code=200,
+        content=AuthState(authenticated=False).model_dump(),
+    )
+    _clear_session_cookie(response)
+    return response
+
+
+@app.get("/api/board", response_model=BoardResponse)
+def get_board(request: Request) -> BoardResponse:
+    username = _require_user(request)
+    return BoardResponse(board=get_board_for_user(username))
+
+
+@app.put("/api/board", response_model=BoardResponse)
+def update_board(payload: BoardUpdateRequest, request: Request) -> BoardResponse:
+    username = _require_user(request)
+    updated = replace_board_for_user(username, payload.board)
+    return BoardResponse(board=updated)
 
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend-out"
 
 if frontend_dir.exists():
-  app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 else:
 
-  @app.get("/", response_class=HTMLResponse)
-  def home() -> str:
-    return """
+    @app.get("/", response_class=HTMLResponse)
+    def home() -> str:
+        return """
 <!doctype html>
 <html lang=\"en\">
   <head>

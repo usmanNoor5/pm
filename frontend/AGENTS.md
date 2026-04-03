@@ -61,11 +61,12 @@ This file describes the current frontend-only Kanban demo in `frontend/` so futu
 
 ## Current Behavior
 
-- Board data is still in-memory in the frontend component.
-- Access to the board is now gated behind backend session auth.
+- Board state is loaded from backend `GET /api/board` after login.
+- Board mutations are persisted through backend `PUT /api/board`.
+- Access to the board is gated behind backend session auth.
 - Columns are fixed in count and order but titles are editable.
 - Cards can be added, deleted, and moved with drag/drop.
-- Auth session persists by cookie, but board data resets on reload because board persistence is not wired yet.
+- Auth session persists by cookie and board changes persist across reload.
 
 ## Test Coverage (Current)
 
@@ -76,7 +77,7 @@ This file describes the current frontend-only Kanban demo in `frontend/` so futu
 - `src/components/AuthApp.test.tsx`
   - Unit tests for unauthenticated login screen and successful sign-in transition
 - `tests/kanban.spec.ts`
-  - E2E tests for auth-gated load, add card, drag/drop move, and logout
+  - E2E tests for auth-gated load, add card, drag/drop move, logout, and persistence after reload
 
 ## Commands
 
