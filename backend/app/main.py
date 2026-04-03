@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app.ai import AiServiceError, MissingApiKeyError, request_ai_message
 from app.db import BoardModel, get_board_for_user, init_db, replace_board_for_user
 
 SESSION_COOKIE_NAME = "pm_session"
@@ -50,6 +51,16 @@ class BoardResponse(BaseModel):
 
 class BoardUpdateRequest(BaseModel):
     board: BoardModel
+
+
+class AiPingRequest(BaseModel):
+    question: str = "2+2"
+
+
+class AiPingResponse(BaseModel):
+    model: str
+    question: str
+    answer: str
 
 
 def _sign_session_id(session_id: str) -> str:
@@ -190,6 +201,20 @@ def update_board(payload: BoardUpdateRequest, request: Request) -> BoardResponse
     username = _require_user(request)
     updated = replace_board_for_user(username, payload.board)
     return BoardResponse(board=updated)
+
+
+@app.post("/api/ai/ping", response_model=AiPingResponse)
+def ai_ping(payload: AiPingRequest, request: Request) -> AiPingResponse:
+    _require_user(request)
+
+    try:
+        reply = request_ai_message(payload.question)
+    except MissingApiKeyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AiServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return AiPingResponse(model=reply.model, question=payload.question, answer=reply.answer)
 
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend-out"

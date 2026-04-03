@@ -6,6 +6,28 @@ Execution rules:
 - Pause for user approval at the checkpoints marked below.
 - Keep implementation simple and MVP-focused.
 
+## Locked Design Decisions
+
+- Runtime architecture:
+	- Single Docker container for MVP.
+	- FastAPI serves statically exported frontend at `/`.
+- Python packaging/runtime:
+	- `uv` is used for dependency/install/run workflows in container.
+	- Container startup uses `python -m uvicorn` to avoid executable lookup issues.
+- Session auth (MVP):
+	- Hardcoded credentials (`user` / `password`).
+	- Server-side in-memory sessions with signed HTTP-only cookie (`pm_session`).
+	- Local secret key via env (`SESSION_SECRET`) with generated fallback.
+- Data persistence:
+	- SQLite database with normalized tables (users, boards, columns, cards).
+	- Optional board JSON snapshot stored per board for fast full-board reads.
+	- DB auto-creation/bootstrap at startup, with default seeded board data.
+- Frontend-backend sync:
+	- Frontend board state source is backend APIs (`GET /api/board`, `PUT /api/board`).
+	- Save-flow guards against stale async responses overwriting newer edits.
+- Local script behavior:
+	- Start scripts support `HOST_PORT` override to avoid local port conflicts.
+
 ## Part 1: Planning and Baseline Documentation
 
 Status checklist:
