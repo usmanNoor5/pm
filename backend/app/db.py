@@ -1,9 +1,7 @@
-import json
 import os
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -34,6 +32,8 @@ class BoardModel(BaseModel):
         return self
 
 
+# NOTE: This seed data mirrors initialData in frontend/src/lib/kanban.ts.
+# If you change one, update the other.
 DEFAULT_BOARD = BoardModel(
     columns=[
         {"id": "col-backlog", "title": "Backlog", "cardIds": ["card-1", "card-2"]},
@@ -302,35 +302,10 @@ def _write_board(conn: sqlite3.Connection, board_id: int, board: BoardModel) -> 
         conn.execute(
             """
             UPDATE boards
-            SET snapshot_json = ?,
-                snapshot_version = snapshot_version + 1,
-                updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             WHERE id = ?
             """,
-            (json.dumps(board.model_dump()), board_id),
+            (board_id,),
         )
 
 
-def get_db_path() -> Path:
-    return get_db_config().db_path
-
-
-def db_exists() -> bool:
-    return get_db_path().exists()
-
-
-def get_raw_snapshot(username: str) -> dict[str, Any] | None:
-    with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT b.snapshot_json
-            FROM boards b
-            JOIN users u ON u.id = b.user_id
-            WHERE u.username = ?
-            LIMIT 1
-            """,
-            (username,),
-        ).fetchone()
-        if not row or row["snapshot_json"] is None:
-            return None
-        return json.loads(str(row["snapshot_json"]))

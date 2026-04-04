@@ -1,26 +1,10 @@
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.ai_board import parse_ai_structured_output
-from app.main import app
-
-
-@pytest.fixture
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "ai-board.db"))
-    with TestClient(app) as test_client:
-        yield test_client
-
-
-def _login(client: TestClient) -> None:
-    response = client.post(
-        "/api/auth/login",
-        json={"username": "user", "password": "password"},
-    )
-    assert response.status_code == 200
+from tests.conftest import login
 
 
 def test_parse_ai_structured_output_valid_payload() -> None:
@@ -71,7 +55,7 @@ def test_ai_chat_requires_auth(client: TestClient) -> None:
 def test_ai_chat_response_only_no_board_update(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _login(client)
+    login(client)
 
     class MockReply:
         ok = True
@@ -79,7 +63,10 @@ def test_ai_chat_response_only_no_board_update(
         response = json.dumps({"response": "No board changes needed", "board": None})
         error = None
 
-    monkeypatch.setattr("app.main.request_ai_message", lambda _: MockReply())
+    async def mock_request(_: str) -> MockReply:
+        return MockReply()
+
+    monkeypatch.setattr("app.main.request_ai_message", mock_request)
 
     before = client.get("/api/board").json()["board"]
     response = client.post(
@@ -105,7 +92,7 @@ def test_ai_chat_response_only_no_board_update(
 def test_ai_chat_valid_board_update_applies_transactionally(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _login(client)
+    login(client)
 
     current_board = client.get("/api/board").json()["board"]
     updated_board = json.loads(json.dumps(current_board))
@@ -122,7 +109,10 @@ def test_ai_chat_valid_board_update_applies_transactionally(
         )
         error = None
 
-    monkeypatch.setattr("app.main.request_ai_message", lambda _: MockReply())
+    async def mock_request(_: str) -> MockReply:
+        return MockReply()
+
+    monkeypatch.setattr("app.main.request_ai_message", mock_request)
 
     response = client.post(
         "/api/ai/chat",
@@ -143,7 +133,7 @@ def test_ai_chat_valid_board_update_applies_transactionally(
 def test_ai_chat_malformed_payload_uses_fallback_without_board_change(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _login(client)
+    login(client)
 
     class MockReply:
         ok = True
@@ -151,7 +141,10 @@ def test_ai_chat_malformed_payload_uses_fallback_without_board_change(
         response = "I think you should move one task to review."
         error = None
 
-    monkeypatch.setattr("app.main.request_ai_message", lambda _: MockReply())
+    async def mock_request(_: str) -> MockReply:
+        return MockReply()
+
+    monkeypatch.setattr("app.main.request_ai_message", mock_request)
 
     before = client.get("/api/board").json()["board"]
     response = client.post(

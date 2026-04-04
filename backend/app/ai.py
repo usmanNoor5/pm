@@ -26,7 +26,7 @@ class AiReply:
     error: str | None
 
 
-def request_ai_message(prompt: str) -> AiReply:
+async def request_ai_message(prompt: str) -> AiReply:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise MissingApiKeyError("OPENROUTER_API_KEY is not configured")
@@ -53,7 +53,10 @@ def request_ai_message(prompt: str) -> AiReply:
         headers["X-Title"] = title
 
     try:
-        response = httpx.post(OPENROUTER_CHAT_URL, headers=headers, json=payload, timeout=30.0)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                OPENROUTER_CHAT_URL, headers=headers, json=payload, timeout=30.0
+            )
         response.raise_for_status()
     except httpx.HTTPError as exc:
         latency_ms = round((time.perf_counter() - started_at) * 1000, 2)

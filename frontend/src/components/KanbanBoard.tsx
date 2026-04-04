@@ -27,6 +27,7 @@ type BoardResponse = {
 type ChatRole = "user" | "assistant";
 
 type ChatMessage = {
+  id: string;
   role: ChatRole;
   content: string;
 };
@@ -198,7 +199,7 @@ export const KanbanBoard = ({
       ...prev,
       cards: {
         ...prev.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: { id, title, details },
       },
       columns: prev.columns.map((column) =>
         column.id === columnId
@@ -242,7 +243,7 @@ export const KanbanBoard = ({
     setChatInput("");
     setChatError(null);
     setIsChatSubmitting(true);
-    setChatMessages((previous) => [...previous, { role: "user", content: trimmed }]);
+    setChatMessages((previous) => [...previous, { id: crypto.randomUUID(), role: "user", content: trimmed }]);
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -260,7 +261,7 @@ export const KanbanBoard = ({
         const message = payload.error || "AI is temporarily unavailable.";
         setChatMessages((previous) => [
           ...previous,
-          { role: "assistant", content: `I couldn't process that request: ${message}` },
+          { id: crypto.randomUUID(), role: "assistant", content: `I couldn't process that request: ${message}` },
         ]);
         setChatError(message);
         return;
@@ -269,7 +270,7 @@ export const KanbanBoard = ({
       if (payload.response) {
         setChatMessages((previous) => [
           ...previous,
-          { role: "assistant", content: payload.response as string },
+          { id: crypto.randomUUID(), role: "assistant", content: payload.response as string },
         ]);
       }
 
@@ -285,7 +286,7 @@ export const KanbanBoard = ({
       setChatError("Unable to reach AI right now.");
       setChatMessages((previous) => [
         ...previous,
-        { role: "assistant", content: "I couldn't reach the AI service right now. Please try again." },
+        { id: crypto.randomUUID(), role: "assistant", content: "I couldn't reach the AI service right now. Please try again." },
       ]);
     } finally {
       setIsChatSubmitting(false);
@@ -417,9 +418,9 @@ export const KanbanBoard = ({
                   Ask me to create, move, edit, or rename cards and columns. I can update the board directly.
                 </div>
               ) : (
-                chatMessages.map((message, index) => (
+                chatMessages.map((message) => (
                   <div
-                    key={`${message.role}-${index}`}
+                    key={message.id}
                     className={
                       message.role === "user"
                         ? "ml-6 rounded-2xl bg-[var(--secondary-purple)] px-4 py-3 text-sm leading-6 text-white"

@@ -4,21 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-
-
-@pytest.fixture
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "board.db"))
-    with TestClient(app) as test_client:
-        yield test_client
-
-
-def _login(client: TestClient) -> None:
-    response = client.post(
-        "/api/auth/login",
-        json={"username": "user", "password": "password"},
-    )
-    assert response.status_code == 200
+from tests.conftest import login
 
 
 def test_startup_creates_database_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -38,7 +24,7 @@ def test_get_board_requires_auth(client: TestClient) -> None:
 
 
 def test_get_board_returns_seeded_data_when_authenticated(client: TestClient) -> None:
-    _login(client)
+    login(client)
     response = client.get("/api/board")
     assert response.status_code == 200
 
@@ -49,7 +35,7 @@ def test_get_board_returns_seeded_data_when_authenticated(client: TestClient) ->
 
 
 def test_update_board_persists_changes(client: TestClient) -> None:
-    _login(client)
+    login(client)
 
     board_response = client.get("/api/board")
     board = board_response.json()["board"]
@@ -65,7 +51,7 @@ def test_update_board_persists_changes(client: TestClient) -> None:
 
 
 def test_update_board_rejects_missing_card_reference(client: TestClient) -> None:
-    _login(client)
+    login(client)
 
     board_response = client.get("/api/board")
     board = board_response.json()["board"]

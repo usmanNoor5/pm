@@ -15,6 +15,8 @@ export type BoardData = {
   cards: Record<string, Card>;
 };
 
+// NOTE: This seed data mirrors DEFAULT_BOARD in backend/app/db.py.
+// If you change one, update the other.
 export const initialData: BoardData = {
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
@@ -161,8 +163,4 @@ export const moveCard = (
   });
 };
 
-export const createId = (prefix: string) => {
-  const randomPart = Math.random().toString(36).slice(2, 8);
-  const timePart = Date.now().toString(36);
-  return `${prefix}-${randomPart}${timePart}`;
-};
+export const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;

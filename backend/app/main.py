@@ -223,11 +223,11 @@ def update_board(payload: BoardUpdateRequest, request: Request) -> BoardResponse
 
 
 @app.post("/api/ai/ping", response_model=AiServiceResponse)
-def ai_ping(payload: AiPingRequest, request: Request) -> JSONResponse:
+async def ai_ping(payload: AiPingRequest, request: Request) -> JSONResponse:
     _require_user(request)
 
     try:
-        reply = request_ai_message(payload.question)
+        reply = await request_ai_message(payload.question)
     except MissingApiKeyError as exc:
         return JSONResponse(
             status_code=503,
@@ -261,7 +261,7 @@ def ai_ping(payload: AiPingRequest, request: Request) -> JSONResponse:
 
 
 @app.post("/api/ai/chat", response_model=AiChatResponse)
-def ai_chat(payload: AiChatRequest, request: Request) -> JSONResponse:
+async def ai_chat(payload: AiChatRequest, request: Request) -> JSONResponse:
     username = _require_user(request)
 
     current_board = get_board_for_user(username)
@@ -272,7 +272,7 @@ def ai_chat(payload: AiChatRequest, request: Request) -> JSONResponse:
     )
 
     try:
-        reply = request_ai_message(prompt)
+        reply = await request_ai_message(prompt)
     except MissingApiKeyError as exc:
         return JSONResponse(
             status_code=503,
